@@ -19,7 +19,7 @@ class LeadScoringModel:
     def __init__(self, model_version: str = "v1"):
         self.model = None
         self.model_version = model_version
-        self.model_path = Path(f"models/lead_model_{model_version}.pkl")
+        self.model_path = Path(f"app/ml/model/lead_model_{model_version}.pkl")
 
         self.feature_order = [
             "years_experience",
