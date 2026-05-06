@@ -7,3 +7,6 @@ class LeadInput(BaseModel):
     name: str
     email: Optional[EmailStr] = None
     role: Optional[str] = None
+    years_experience: int = 3
+    company_size: int = 100
+    activity_score: int = 5

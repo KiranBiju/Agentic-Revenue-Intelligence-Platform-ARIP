@@ -17,37 +17,64 @@ def generate_leads_dataset(
     data = []
 
     for _ in range(n):
-        #Feature distributions (more realistic than uniform)
+
+        #FEATURE DISTRIBUTIONS
 
         years_experience = int(np.clip(np.random.normal(5, 3), 0, 20))
-        company_size = int(np.clip(np.random.lognormal(mean=3, sigma=1), 1, 5000))
-        role_score = np.random.randint(1, 10)
-        activity_score = np.random.randint(1, 10)
 
-        score = 0
+        company_size = int(
+            np.clip(np.random.lognormal(mean=3, sigma=1), 1, 5000)
+        )
 
-        score += activity_score * 0.5
-        score += years_experience * 0.2
+        role_score = np.random.randint(1, 11)   # 1–10 (slightly stronger scale)
+        activity_score = np.random.randint(1, 11)
 
-        if company_size < 50:
-            score += 2
+        #BASE SCORING FUNCTION
 
-        if role_score > 7:
+        score = 0.0
+
+        # Strongest signal → activity
+        score += activity_score * 0.8
+
+        # Experience matters but less than activity
+        score += years_experience * 0.3
+
+        # Company size influence (SMBs respond more)
+        if company_size < 100:
             score += 2.5
+        elif company_size < 500:
+            score += 1.0
 
-        #Feature interaction
-        if role_score > 7 and activity_score > 7:
-            score += 2
+        # Role strength
+        if role_score >= 8:
+            score += 3.0
+        elif role_score >= 6:
+            score += 1.5
 
-        #Add noise
-        score += np.random.normal(0, 1)
+        #FEATURE INTERACTIONS
 
-        #Convert to probability
-        probability = 1 / (1 + np.exp(-score / 5))  # sigmoid scaling
+        # High intent synergy
+        if role_score >= 8 and activity_score >= 8:
+            score += 3.5
 
-        #Class imbalance control
-        # Bias towards fewer positive responses
-        probability *= 0.6
+        if activity_score >= 7 and years_experience >= 7:
+            score += 2.0
+
+        #NOISE
+
+        score += np.random.normal(0, 0.8)
+
+        #CONVERT TO PROBABILITY
+
+        probability = 1 / (1 + np.exp(-score / 4.5))
+
+        #Slight class imbalance 
+        probability *= 0.65
+
+        #Clamp probability
+        probability = np.clip(probability, 0.01, 0.95)
+
+        #LABEL GENERATION
 
         responded = np.random.binomial(1, probability)
 
@@ -61,8 +88,14 @@ def generate_leads_dataset(
 
     df = pd.DataFrame(data)
 
+    #DATASET HEALTH CHECK
+
     positive_rate = df["responded"].mean()
-    logger.info(f"Generated dataset with {n} rows | response_rate={positive_rate:.2f}")
+    logger.info(
+        f"Generated dataset | rows={n} | response_rate={positive_rate:.2f}"
+    )
+
+    #SAVE DATASET
 
     if save_path:
         path = Path(save_path)
@@ -77,4 +110,5 @@ if __name__ == "__main__":
         n=1001,
         save_path="app/ml/data/leads_dataset.csv"
     )
+
     print(df.head())

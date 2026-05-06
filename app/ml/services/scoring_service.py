@@ -76,6 +76,10 @@ def score_leads(
     if sort_results:
         results.sort(key=lambda x: x["priority_score"], reverse=True)
 
+    #Ranking
+    for idx, item in enumerate(results):
+        item["rank"] = idx + 1    
+
     #Top N selection
     if top_n is not None:
         results = results[:top_n]
@@ -86,4 +90,7 @@ def score_leads(
         f"Scored {len(leads)} leads | returned {len(results)} | time={duration:.4f}s"
     )
 
+    print("FEATURES:", features)
+
     return results
+    

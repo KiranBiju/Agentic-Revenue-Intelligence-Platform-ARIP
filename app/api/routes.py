@@ -12,8 +12,4 @@ async def run_outreach(request: CampaignRequest):
     
     result = orchestrator.run_campaign(request.leads)
 
-    return {
-        "status": "received",
-        "processed_count": len(request.leads),
-        "orchestrator_result": result
-    }
+    return result
