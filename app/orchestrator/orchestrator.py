@@ -3,6 +3,7 @@ from typing import List, Dict
 from app.schemas.lead import LeadInput
 from app.ml.services.scoring_service import score_leads
 from app.orchestrator.state import CampaignState
+from app.agents.planner_agent import PlannerAgent
 from app.core.logging import logger
 
 
@@ -10,6 +11,7 @@ class DecisionOrchestrator:
 
     def __init__(self):
         self.state: CampaignState | None = None
+        self.planner_agent = PlannerAgent()
 
     #INITIALIZE CAMPAIGN
 
@@ -60,10 +62,10 @@ class DecisionOrchestrator:
 
     def plan_strategy(self):
 
-        strategy = {
-            "tone": "professional",
-            "channel": "email"
-        }
+        strategy = self.planner_agent.execute(
+        selected_leads=self.state.selected_leads,
+        campaign_metadata={}
+    )
 
         self.state.strategy = strategy
 
