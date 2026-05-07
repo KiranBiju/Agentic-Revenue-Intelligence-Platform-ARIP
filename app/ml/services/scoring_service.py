@@ -90,7 +90,5 @@ def score_leads(
         f"Scored {len(leads)} leads | returned {len(results)} | time={duration:.4f}s"
     )
 
-    print("FEATURES:", features)
-
     return results
     

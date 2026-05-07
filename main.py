@@ -2,9 +2,7 @@ import pydantic
 import dotenv
 from fastapi import FastAPI
 from app.api.routes import router
-from app.core.logging import setup_logging
-
-setup_logging()
+from app.core.logging import logger
 
 app=FastAPI()
 
