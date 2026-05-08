@@ -4,14 +4,20 @@ from app.schemas.lead import LeadInput
 from app.ml.services.scoring_service import score_leads
 from app.orchestrator.state import CampaignState
 from app.agents.planner_agent import PlannerAgent
+from app.agents.executor_agent import ExecutorAgent
+from app.agents.validator_agent import ValidatorAgent
 from app.core.logging import logger
 
 
 class DecisionOrchestrator:
+    
+    MAX_RETRIES = 3
 
     def __init__(self):
         self.state: CampaignState | None = None
         self.planner_agent = PlannerAgent()
+        self.executor_agent = ExecutorAgent()
+        self.validator_agent = ValidatorAgent()
 
     #INITIALIZE CAMPAIGN
 
@@ -73,6 +79,7 @@ class DecisionOrchestrator:
 
         self.state.add_log("[PLAN] Strategy created")
 
+
     #EXECUTION LOOP
 
     def execute_pipeline(self):
@@ -85,12 +92,93 @@ class DecisionOrchestrator:
 
         for lead in self.state.selected_leads:
 
-            result = {
-                "user_id": lead["user_id"],
-                "status": "pending"
-            }
+            user_id = lead["user_id"]
 
-            results.append(result)
+            success = False
+            attempts = 0
+            validation_issues = []
+
+            retry_context = {}
+
+            while attempts < self.MAX_RETRIES:
+
+                 attempts += 1
+
+                #EXECUTION
+
+                 generated = self.executor_agent.execute(
+                    lead=lead,
+                    strategy=self.state.strategy,
+                    retry_context=retry_context
+                )
+
+                 self.state.add_trace(
+                    agent="ExecutorAgent",
+                    action="generate_message",
+                    outcome=f"attempt_{attempts}"
+                )
+
+                #VALIDATION
+
+                 validation = self.validator_agent.execute(
+                     generated_message=generated,
+                     strategy=self.state.strategy
+                 )
+
+                 self.state.add_trace(
+                    agent="ValidatorAgent",
+                    action="validate_message",
+                    outcome="passed" if validation["valid"] else "failed"
+                 )
+
+                 #SUCCESS
+
+                 if validation["valid"]:
+
+                     results.append({
+                        "user_id": user_id,
+                        "status": "success",
+                        "attempts": attempts,
+                        "message": generated["message"],
+                        "channel": generated["channel"],
+                        "validation_issues": []
+                     })
+
+                     success = True
+
+                     break
+
+                    #FAILURE
+
+                 validation_issues = validation["issues"]
+
+                 logger.warning(
+                    f"[RETRY] Validation failed for user {user_id} "
+                    f"(attempt {attempts})"
+                 )
+
+                 #Retry strategy
+                 retry_context = {
+                    "soften_tone": True,
+                    "short_cta": True
+                 }
+
+                #MAX RETRIES
+
+            if not success:
+
+                logger.error(
+                    f"[FAILED] Validation failed after retries "
+                    f"for user {user_id}"
+                 )
+
+                results.append({
+                    "user_id": user_id,
+                    "status": "failed",
+                    "attempts": attempts,
+                    "reason": "validation_failed",
+                    "validation_issues": validation_issues
+                })
 
         self.state.results = results
 

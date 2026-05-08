@@ -63,7 +63,14 @@ def score_leads(
             priority_score = (0.6 * response_prob) + (0.4 * conversion_prob)
 
             results.append({
+                #Original lead metadata
                 "user_id": lead.user_id,
+                "name": lead.name,
+                "email": getattr(lead, "email", None),
+                "role": getattr(lead, "role", None),
+                "company": getattr(lead, "company", None),
+
+                #ML outputs
                 "response_prob": round(response_prob, 4),
                 "conversion_prob": round(conversion_prob, 4),
                 "priority_score": round(priority_score, 4)

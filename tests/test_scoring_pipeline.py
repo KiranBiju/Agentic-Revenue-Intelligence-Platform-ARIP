@@ -7,9 +7,11 @@ def generate_test_leads(n=30):
         LeadInput(
             user_id=i,
             name=f"User{i}",
+            email=f"user{i}@example.com",
             role="Founder" if i % 3 == 0 else "Engineer",
             activity_score=(i % 10) + 1,
             years_experience=(i % 7) + 1,
+            company="OpenAI" if i % 2 == 0 else "Google",
             company_size=(i % 5) * 50 + 50
         )
         for i in range(n)
