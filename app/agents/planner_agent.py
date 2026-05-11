@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import Dict, Any, List
 
 from app.agents.base_agent import BaseAgent
 from app.core.logging import logger
@@ -11,74 +11,48 @@ class PlannerAgent(BaseAgent):
 
     def execute(
         self,
-        selected_leads: List[Dict],
-        campaign_metadata: Dict[str, Any] | None = None
-    ) -> Dict[str, Any]:
+        selected_leads: List[Dict[str, Any]],
+        campaign_metadata: Dict[str, Any]
+    ) -> Dict[int, Dict[str, Any]]:
 
-        logger.info("[PLANNER] Building outreach strategy")
+        logger.info("[PLANNER] Building per-lead strategies")
 
-        if not selected_leads:
-
-            logger.warning("[PLANNER] No leads provided")
-
-            return {
-                "tone": "professional",
-                "channel": "email",
-                "follow_up": False,
-                "personalization_level": "low"
-            }
-
-        #Simple deterministic strategy
-
-        founder_count = 0
-        engineer_count = 0
+        strategies = {}
 
         for lead in selected_leads:
 
             role = str(lead.get("role", "")).lower()
+            user_id = lead.get("user_id")
 
             if "founder" in role:
-                founder_count += 1
+
+                strategy = {
+                    "tone": "persuasive",
+                    "channel": "email",
+                    "follow_up": True,
+                    "personalization_level": "high"
+                }
 
             elif "engineer" in role:
-                engineer_count += 1
 
-        #Strategy selection
+                strategy = {
+                    "tone": "technical",
+                    "channel": "linkedin",
+                    "follow_up": False,
+                    "personalization_level": "medium"
+                }
 
-        if founder_count > engineer_count:
+            else:
 
-            strategy = {
-                "tone": "persuasive",
-                "channel": "email",
-                "follow_up": True,
-                "personalization_level": "high"
-            }
+                strategy = {
+                    "tone": "professional",
+                    "channel": "email",
+                    "follow_up": False,
+                    "personalization_level": "low"
+                }
 
-            logger.info(
-                "[PLANNER] Founder-heavy campaign detected"
-            )
+            strategies[user_id] = strategy
 
-        else:
+        logger.info("[PLANNER] Per-lead strategies created")
 
-            strategy = {
-                "tone": "technical",
-                "channel": "linkedin",
-                "follow_up": False,
-                "personalization_level": "medium"
-            }
-
-            logger.info(
-                "[PLANNER] Engineer-heavy campaign detected"
-            )
-
-        #Logging
-
-        logger.info(
-            f"[PLANNER] Tone set to {strategy['tone']}"
-        )
-
-        logger.info(
-            f"[PLANNER] Channel selected: {strategy['channel']}"
-        )
-
-        return strategy
+        return strategies

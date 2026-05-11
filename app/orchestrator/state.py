@@ -1,8 +1,8 @@
+import uuid
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-import uuid
-
+from uuid import uuid4
 
 @dataclass
 class CampaignState:
@@ -47,6 +47,7 @@ class CampaignState:
             "timestamp": datetime.utcnow().isoformat()
         })
 
+
     def add_log(self, message: str):
         timestamp = datetime.utcnow().isoformat()
         log_entry = f"[{timestamp}] {message}"
@@ -55,3 +56,16 @@ class CampaignState:
     def update_status(self, new_status: str):
         self.status = new_status
         self.add_log(f"Status changed to: {new_status}")
+
+@dataclass
+class AgentTrace:
+
+    trace_id: str
+    campaign_id: str
+    agent: str
+    action: str
+    input_data: Any
+    output_data: Any
+    latency: float
+    success: bool
+    timestamp: str

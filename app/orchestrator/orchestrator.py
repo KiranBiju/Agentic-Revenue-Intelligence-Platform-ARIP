@@ -1,4 +1,6 @@
 import os
+from uuid import uuid4
+from datetime import datetime
 from typing import List, Dict
 from app.schemas.lead import LeadInput
 from app.ml.services.scoring_service import score_leads
@@ -7,6 +9,7 @@ from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.validator_agent import ValidatorAgent
 from app.core.logging import logger
+from app.orchestrator.state import AgentTrace
 
 
 class DecisionOrchestrator:
@@ -133,7 +136,10 @@ class DecisionOrchestrator:
 
                  #SUCCESS
 
-                 if validation["valid"]:
+                 if (
+                     validation["valid"]
+                     and validation["quality_score"] >= 0.75
+                ):
 
                      results.append({
                         "user_id": user_id,
@@ -141,6 +147,7 @@ class DecisionOrchestrator:
                         "attempts": attempts,
                         "message": generated["message"],
                         "channel": generated["channel"],
+                        "quality_score": validation["quality_score"],
                         "validation_issues": []
                      })
 
@@ -181,6 +188,30 @@ class DecisionOrchestrator:
                 })
 
         self.state.results = results
+
+    def add_agent_trace(
+        self,
+        agent: str,
+        action: str,
+        input_data,
+        output_data,
+        latency: float,
+        success: bool
+):
+
+        trace = AgentTrace(
+            trace_id=str(uuid4()),
+            campaign_id=self.state.campaign_id,
+            agent=agent,
+            action=action,
+            input_data=input_data,
+            output_data=output_data,
+            latency=latency,
+            success=success,
+            timestamp=datetime.utcnow().isoformat()
+        )
+
+        self.state.agent_traces.append(trace.__dict__)    
 
 
     def finalize_campaign(self) -> Dict:

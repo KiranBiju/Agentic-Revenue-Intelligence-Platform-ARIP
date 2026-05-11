@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional
 from datetime import datetime
 from app.agents.base_agent import BaseAgent
+from app.ml.model.provider import LLMProvider
 from app.core.logging import logger
 
 
@@ -8,6 +9,7 @@ class ExecutorAgent(BaseAgent):
 
     def __init__(self):
         super().__init__(name="ExecutorAgent")
+        self.llm = LLMProvider()
 
     def execute(
         self,
@@ -53,7 +55,20 @@ class ExecutorAgent(BaseAgent):
                 f"through AI-driven workflows.\n\n"
                 f"I'd love to show you how this could help your team.\n\n"
                 f"{cta}\n"
+            
             )
+
+            #raw_message = (...)
+
+            #message = self.llm.generate(
+                #prompt=raw_message,
+                #metadata={
+                   #"tone": tone,
+                   #"channel": channel
+                #}
+            #)
+
+            
 
         elif tone == "technical":
 
@@ -66,6 +81,16 @@ class ExecutorAgent(BaseAgent):
                 f"{cta}\n"
             )
 
+            #raw_message = (...)
+
+            #message = self.llm.generate(
+                #prompt=raw_message,
+                #metadata={
+                   #"tone": tone,
+                   #"channel": channel
+                #}
+            #)    
+
         else:
 
             message = (
@@ -74,6 +99,16 @@ class ExecutorAgent(BaseAgent):
                 f"for teams like yours at {company}.\n\n"
                 f"{cta}\n"
             )
+
+            #raw_message = (...)
+
+            #message = self.llm.generate(
+                #prompt=raw_message,
+                #metadata={
+                   #"tone": tone,
+                   #"channel": channel
+                #}
+            #)
 
         logger.info(
             f"[EXECUTOR] Message generated for user {user_id}"
