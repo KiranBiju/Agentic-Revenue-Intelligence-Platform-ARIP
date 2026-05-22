@@ -79,6 +79,11 @@ ARIP solves this problem by:
 
 ---
 
+[WATCH DEMO VIDEO](https://drive.google.com/file/d/1_GCoRW8gYpeNa47RNOxJVGB8XtjwyzhD/view?usp=sharing)
+
+
+---
+
 # 🏗️ System Architecture
 
 ```text
@@ -561,12 +566,6 @@ subject to:
 
 ---
 
-# 🧠 Interview Explanation
-
-> "I built an Agentic Revenue Intelligence Platform that combines machine learning and multi-agent orchestration to automate revenue operations. The system predicts which leads are most likely to convert, selects the highest-priority prospects under outreach constraints, generates personalized outreach, validates message quality, executes campaigns, and tracks every decision with full observability."
-
----
-
 # 🏅 Engineering Highlights
 
 This project demonstrates:
@@ -586,13 +585,11 @@ This project demonstrates:
 
 ## AI Enhancements
 
-* Real OpenAI/Groq integration
 * RAG-based personalization
 * A/B testing of prompts
 
 ## Product Enhancements
 
-* React/Next.js dashboard
 * Authentication and RBAC
 * Webhook support
 
@@ -600,7 +597,6 @@ This project demonstrates:
 
 * CI/CD with GitHub Actions
 * Kubernetes deployment
-* Prometheus + Grafana
 
 ---
 
