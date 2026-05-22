@@ -82,7 +82,7 @@ ARIP solves this problem by:
 # 🏗️ System Architecture
 
 ```text
-Client (CRM / Dashboard / API User)
+Client (CRM / Streamlit Dashboard / API User)
                 ↓
         FastAPI API Gateway
                 ↓
@@ -220,6 +220,10 @@ Each lead receives:
 * Uvicorn
 * Pydantic
 
+## Frontend
+
+* Streamlit
+
 ## Machine Learning
 
 * Scikit-learn
@@ -237,13 +241,12 @@ Each lead receives:
 
 ## AI / LLM
 
-* OpenAI API (optional)
-* Groq API (optional)
+* Groq
 
 ## DevOps
 
 * Docker
-* Docker Compose (optional)
+* Docker Compose 
 
 ## Observability
 
@@ -256,57 +259,95 @@ Each lead receives:
 
 ```text
 A.R.I.P/
-├── app/
-│   ├── agents/
-│   │   ├── planner.py
-│   │   ├── executor.py
-│   │   ├── validator.py
-│   │   └── optimizer.py
-│   │
-│   ├── api/
+├── app
+│   ├── agents
+│   │   ├── base_agent.py
+│   │   ├── executor_agent.py
+│   │   ├── planner_agent.py
+│   │   ├── validator_agent.py
+│   │   └── __init__.py
+│   ├── api
+│   │   ├── health.py
 │   │   ├── routes.py
-│   │   ├── analytics.py
-│   │   └── health.py
-│   │
-│   ├── core/
+│   │   ├── tracer.py
+│   │   └── __init__.py
+│   ├── assets
+│   │   ├── c1e8bb76-a050-444a-a0d5-1b6add55605b.webm
+│   │   └── Home.png
+│   ├── core
 │   │   ├── config.py
 │   │   ├── logger.py
+│   │   ├── logging.py
 │   │   ├── metrics.py
-│   │   └── redis_client.py
-│   │
-│   ├── db/
+│   │   ├── redis_client.py
+│   │   └── __init__.py
+│   ├── db
+│   │   ├── base.py
+│   │   ├── crud.py
 │   │   ├── models.py
 │   │   ├── session.py
-│   │   └── crud.py
-│   │
-│   ├── ml/
-│   │   ├── scorer.py
-│   │   └── ranker.py
-│   │
-│   ├── observability/
-│   │   └── tracer.py
-│   │
-│   ├── orchestration/
-│   │   └── decision_orchestrator.py
-│   │
-│   ├── schemas/
-│   │   ├── lead.py
+│   │   └── __init__.py
+│   ├── frontend
+│   │   ├── components
+│   │   │   ├── analytics.py
+│   │   │   ├── campaign_results.py
+│   │   │   ├── lead_table.py
+│   │   │   └── metrics_card.py
+│   │   ├── utils
+│   │   │   ├── api.py
+│   │   │   └── sample_data.py
+│   │   └── app.py
+│   ├── langgraph
+│   │   ├── nodes
+│   │   │   ├── executor_node.py
+│   │   │   ├── finalize_node.py
+│   │   │   ├── optimizer_node.py
+│   │   │   ├── planner_node.py
+│   │   │   └── validator_node.py
+│   │   ├── graph.py
+│   │   ├── routers.py
+│   │   └── state.py
+│   ├── llm
+│   │   ├── chains.py
+│   │   ├── prompts.py
+│   │   └── provider.py
+│   ├── ml
+│   │   ├── data
+│   │   │   ├── generate_data.py
+│   │   │   └── leads_dataset.csv
+│   │   ├── model
+│   │   │   ├── lead_model.py
+│   │   │   ├── lead_model_v1.pkl
+│   │   │   └── provider.py
+│   │   ├── services
+│   │   │   └── scoring_service.py
+│   │   └── __init__.py
+│   ├── orchestrator
+│   │   ├── orchestrator.py
+│   │   ├── state.py
+│   │   └── __init__.py
+│   ├── schemas
+│   │   ├── analytics.py
 │   │   ├── campaign.py
-│   │   └── analytics.py
-│   │
-│   └── tools/
+│   │   ├── lead.py
+│   │   └── __init__.py
+│   └── tools
 │       ├── email_tool.py
-│       └── crm_tool.py
-├── tests/
+│       ├── langchain_tools.py
+│       └── __init__.py
+├── tests
+│   └── test_scoring_pipeline.py
+├── .dockerignore
 ├── .env
 ├── .gitignore
+├── compose.yaml
 ├── Dockerfile
-├── requirements.txt
+├── LICENSE
 ├── main.py
-└── README.md
+├── README.Docker.md
+├── README.md
+└── requirements.txt
 ```
-
----
 
 # ⚡ API Endpoints
 
@@ -413,10 +454,12 @@ pip install -r requirements.txt
 Create `.env`:
 
 ```env
-APP_ENV=dev
-MAX_OUTREACH=60
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/ai_gatewayAPP_ENV=dev
 DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/arip
 REDIS_URL=redis://localhost:6379/0
+LLM_PROVIDER=groq
+GROQ_API_KEY=PUT YOUR AI API KEY
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
 ## 5. Start PostgreSQL and Redis
@@ -429,7 +472,7 @@ docker run --name arip-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=ari
 docker run --name arip-redis -p 6379:6379 -d redis:7
 ```
 
-## 6. Run the Application
+## 6. Run the Backend
 
 ```bash
 uvicorn main:app --reload
@@ -441,6 +484,18 @@ uvicorn main:app --reload
 http://127.0.0.1:8000/docs
 ```
 
+## 8. Run the Frontend
+
+```bash
+streamlit run frontend/app.py
+```
+---
+
+## 7. Open API Docs
+
+```text
+http://localhost:8501 
+```
 ---
 
 # 🐳 Docker Support
@@ -560,11 +615,11 @@ This project demonstrates:
 
 ### Frontend Dashboard
 
-* Vercel
+* Streamlit
 
 ### Database
 
-* Neon PostgreSQL
+* PostgreSQL
 
 ### Cache
 
@@ -574,7 +629,7 @@ This project demonstrates:
 
 # 📸 Demo Flow
 
-1. Upload 100 leads.
+1. Upload 1000+ leads.
 2. Score and rank all leads.
 3. Select top 60.
 4. Generate personalized outreach.
@@ -606,10 +661,3 @@ ARIP is a top-tier portfolio project that combines:
 * Advanced AI architecture
 * Production backend engineering
 * Deployment readiness
-
-This is the kind of project that can strongly differentiate you for roles in:
-
-* AI Engineering
-* Machine Learning Engineering
-* Backend Engineering
-* Agentic AI Systems
