@@ -1,5 +1,9 @@
 # 🚀 Agentic Revenue Intelligence Platform (ARIP)
 
+<p align="center">
+  <img src="app/assets/Home.png" width="850"/>
+</p>
+
 > **A production-grade AI system that autonomously prioritizes high-conversion leads and executes personalized outreach using machine learning, multi-agent orchestration, and real-world tool integrations.**
 
 ---
