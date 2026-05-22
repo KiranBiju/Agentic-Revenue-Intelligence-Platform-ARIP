@@ -1,5 +1,9 @@
 from typing import Dict, Any, Optional
 from datetime import datetime
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 from app.agents.base_agent import BaseAgent
 from app.ml.model.provider import LLMProvider
 from app.core.logging import logger
@@ -8,8 +12,61 @@ from app.core.logging import logger
 class ExecutorAgent(BaseAgent):
 
     def __init__(self):
+
         super().__init__(name="ExecutorAgent")
-        self.llm = LLMProvider()
+
+        self.llm_provider = LLMProvider()
+
+        self.llm = self.llm_provider.get_llm()
+
+        self.parser = StrOutputParser()
+
+        self.prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """
+You are an elite AI sales outreach agent.
+
+Your job is to generate highly personalized outreach messages.
+
+RULES:
+- Be concise
+- Avoid spammy tone
+- Keep message under 120 words
+- Sound human and professional
+- Personalize using role and company
+- Include a soft CTA
+- Never use hype language
+- Never use excessive punctuation
+"""
+                ),
+
+                (
+                    "human",
+                    """
+Generate a {tone} outreach message.
+
+Lead Details:
+Name: {name}
+Role: {role}
+Company: {company}
+
+Channel: {channel}
+
+CTA:
+{cta}
+"""
+                )
+            ]
+        )
+
+        self.chain = (
+            self.prompt
+            | self.llm
+            | self.parser
+        )
+
 
     def execute(
         self,
@@ -21,22 +78,27 @@ class ExecutorAgent(BaseAgent):
         retry_context = retry_context or {}
 
         user_id = lead.get("user_id")
+
         name = lead.get("name", "there")
+
         role = lead.get("role", "professional")
+
         company = lead.get("company", "your company")
 
-        #Strategy defaults
+
         tone = strategy.get("tone", "professional")
+
         channel = strategy.get("channel", "email")
 
-        #RETRY ADAPTATION
 
-        #If validator says tone too aggressive
         if retry_context.get("soften_tone"):
+
             tone = "professional"
 
-        #Short CTA for retry attempts
-        short_cta = retry_context.get("short_cta", False)
+        short_cta = retry_context.get(
+            "short_cta",
+            False
+        )
 
         cta = (
             "Open to a quick chat?"
@@ -44,71 +106,35 @@ class ExecutorAgent(BaseAgent):
             else "Would a short conversation next week make sense?"
         )
 
-        #MESSAGE GENERATION
 
-        if tone == "persuasive":
+        try:
+
+            message = self.chain.invoke(
+                {
+                    "tone": tone,
+                    "name": name,
+                    "role": role,
+                    "company": company,
+                    "channel": channel,
+                    "cta": cta
+                }
+            )
+
+        except Exception as e:
+
+            logger.error(
+                f"[EXECUTOR] LLM generation failed "
+                f"for user {user_id}: {str(e)}"
+            )
+
 
             message = (
                 f"Hi {name},\n\n"
                 f"I noticed your work as a {role} at {company}. "
-                f"We're helping fast-moving teams improve outreach performance "
-                f"through AI-driven workflows.\n\n"
-                f"I'd love to show you how this could help your team.\n\n"
-                f"{cta}\n"
-            
+                f"We're helping teams improve outreach workflows "
+                f"using AI-driven automation.\n\n"
+                f"{cta}"
             )
-
-            #raw_message = (...)
-
-            #message = self.llm.generate(
-                #prompt=raw_message,
-                #metadata={
-                   #"tone": tone,
-                   #"channel": channel
-                #}
-            #)
-
-            
-
-        elif tone == "technical":
-
-            message = (
-                f"Hi {name},\n\n"
-                f"I saw that you're working as a {role} at {company}. "
-                f"We've built an AI orchestration system that automates lead scoring, "
-                f"ranking, and campaign execution.\n\n"
-                f"I'd be happy to share technical details if you're interested.\n\n"
-                f"{cta}\n"
-            )
-
-            #raw_message = (...)
-
-            #message = self.llm.generate(
-                #prompt=raw_message,
-                #metadata={
-                   #"tone": tone,
-                   #"channel": channel
-                #}
-            #)    
-
-        else:
-
-            message = (
-                f"Hi {name},\n\n"
-                f"I wanted to reach out regarding AI-powered outreach systems "
-                f"for teams like yours at {company}.\n\n"
-                f"{cta}\n"
-            )
-
-            #raw_message = (...)
-
-            #message = self.llm.generate(
-                #prompt=raw_message,
-                #metadata={
-                   #"tone": tone,
-                   #"channel": channel
-                #}
-            #)
 
         logger.info(
             f"[EXECUTOR] Message generated for user {user_id}"
@@ -116,7 +142,8 @@ class ExecutorAgent(BaseAgent):
 
         return {
             "user_id": user_id,
-            "message": message,
+            "message": message.strip(),
             "channel": channel,
+            "tone": tone,
             "generated_at": datetime.utcnow().isoformat()
         }

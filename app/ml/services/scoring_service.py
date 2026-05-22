@@ -79,23 +79,18 @@ def score_leads(
         except Exception as e:
             logger.exception(f"Failed to score lead {lead.user_id}: {e}")
 
-    #Sorting
     if sort_results:
         results.sort(key=lambda x: x["priority_score"], reverse=True)
 
-    #Ranking
     for idx, item in enumerate(results):
         item["rank"] = idx + 1    
 
-    #Top N selection
     if top_n is not None:
         results = results[:top_n]
 
-    #Latency logging
     duration = time.perf_counter() - start_time
     logger.info(
         f"Scored {len(leads)} leads | returned {len(results)} | time={duration:.4f}s"
     )
 
     return results
-    

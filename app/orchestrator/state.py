@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from uuid import uuid4
+from typing import TypedDict, List, Dict, Any
 
 @dataclass
 class CampaignState:
@@ -69,3 +70,4 @@ class AgentTrace:
     latency: float
     success: bool
     timestamp: str
+

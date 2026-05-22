@@ -1,193 +1,552 @@
 import os
+import time
 from uuid import uuid4
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, TypedDict
+from langgraph.graph import StateGraph, END
 from app.schemas.lead import LeadInput
 from app.ml.services.scoring_service import score_leads
 from app.orchestrator.state import CampaignState
+from app.orchestrator.state import AgentTrace
 from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.validator_agent import ValidatorAgent
 from app.core.logging import logger
-from app.orchestrator.state import AgentTrace
+
+class GraphState(TypedDict):
+
+    input_leads: List[LeadInput]
+
+    scored_leads: list
+
+    selected_leads: list
+
+    strategy: dict
+
+    results: list
+
+    current_lead_index: int
+
+    campaign_id: str
+
+    status: str
+
+    logs: list
 
 
 class DecisionOrchestrator:
-    
+
     MAX_RETRIES = 3
 
     def __init__(self):
+
         self.state: CampaignState | None = None
+
         self.planner_agent = PlannerAgent()
+
         self.executor_agent = ExecutorAgent()
+
         self.validator_agent = ValidatorAgent()
 
-    #INITIALIZE CAMPAIGN
+        self.graph = self._build_graph()
 
-    def initialize_campaign(self, leads: List[LeadInput]):
+    def _build_graph(self):
+
+        workflow = StateGraph(GraphState)
+
+        workflow.add_node(
+            "initialize_campaign",
+            self.initialize_campaign_node
+        )
+
+        workflow.add_node(
+            "score_leads",
+            self.score_leads_node
+        )
+
+        workflow.add_node(
+            "select_top_leads",
+            self.select_top_leads_node
+        )
+
+        workflow.add_node(
+            "plan_strategy",
+            self.plan_strategy_node
+        )
+
+        workflow.add_node(
+            "execute_pipeline",
+            self.execute_pipeline_node
+        )
+
+        workflow.add_node(
+            "finalize_campaign",
+            self.finalize_campaign_node
+        )
+
+        workflow.set_entry_point(
+            "initialize_campaign"
+        )
+
+        workflow.add_edge(
+            "initialize_campaign",
+            "score_leads"
+        )
+
+        workflow.add_edge(
+            "score_leads",
+            "select_top_leads"
+        )
+
+        workflow.add_edge(
+            "select_top_leads",
+            "plan_strategy"
+        )
+
+        workflow.add_edge(
+            "plan_strategy",
+            "execute_pipeline"
+        )
+
+        workflow.add_edge(
+            "execute_pipeline",
+            "finalize_campaign"
+        )
+
+        workflow.add_edge(
+            "finalize_campaign",
+            END
+        )
+
+        return workflow.compile()
+
+    def initialize_campaign_node(
+        self,
+        state: GraphState
+    ):
 
         self.state = CampaignState()
 
-        self.state.input_leads = leads
-        self.state.update_status("processing")
+        self.state.input_leads = state[
+            "input_leads"
+        ]
 
-        total = len(leads)
+        self.state.update_status(
+            "processing"
+        )
 
-        logger.info("[INIT] Campaign started")
-        logger.info(f"[INIT] Received {total} leads")
+        total = len(
+            state["input_leads"]
+        )
 
-        self.state.add_log("[INIT] Campaign started")
-        self.state.add_log(f"[INIT] Received {total} leads")
+        logger.info(
+            "[INIT] Campaign started"
+        )
 
-    #ML SCORING
+        logger.info(
+            f"[INIT] Received {total} leads"
+        )
 
-    def score_leads(self):
+        self.state.add_log(
+            "[INIT] Campaign started"
+        )
 
-        scored = score_leads(self.state.input_leads, top_n=None)
+        self.state.add_log(
+            f"[INIT] Received {total} leads"
+        )
+
+        return {
+            **state,
+
+            "campaign_id":
+                self.state.campaign_id,
+
+            "status": "processing",
+
+            "logs": self.state.logs
+        }
+
+    def score_leads_node(
+        self,
+        state: GraphState
+    ):
+
+        scored = score_leads(
+            self.state.input_leads,
+            top_n=None
+        )
 
         self.state.scored_leads = scored
 
-        logger.info(f"[ML] Scored {len(scored)} leads")
+        logger.info(
+            f"[ML] Scored {len(scored)} leads"
+        )
 
-        self.state.add_log(f"[ML] Scored {len(scored)} leads")
+        self.state.add_log(
+            f"[ML] Scored {len(scored)} leads"
+        )
 
-    #TOP-K SELECTION
+        return {
+            **state,
 
-    def select_top_leads(self):
+            "scored_leads": scored,
 
-        max_outreach = int(os.getenv("MAX_OUTREACH", 10))
+            "ranked_leads": scored,
 
-        selected = self.state.scored_leads[:max_outreach]
+            "logs": self.state.logs
+        }
+
+    def select_top_leads_node(
+        self,
+        state: GraphState
+    ):
+
+        max_outreach = int(
+            os.getenv(
+                "MAX_OUTREACH",
+                10
+            )
+        )
+
+        selected = state[
+            "scored_leads"
+        ][:max_outreach]
 
         self.state.selected_leads = selected
 
-        logger.info(f"[SELECT] Top {len(selected)} leads selected")
+        logger.info(
+            f"[SELECT] Top {len(selected)} leads selected"
+        )
 
         self.state.add_log(
             f"[SELECT] Top {len(selected)} leads selected"
         )
 
-    #STRATEGY PLANNING
+        return {
+            **state,
 
-    def plan_strategy(self):
+            "selected_leads": selected,
+
+            "logs": self.state.logs
+        }
+
+    def plan_strategy_node(
+        self,
+        state: GraphState
+    ):
+
+        start = time.time()
 
         strategy = self.planner_agent.execute(
-        selected_leads=self.state.selected_leads,
-        campaign_metadata={}
-    )
+            selected_leads=state[
+                "selected_leads"
+            ],
+            campaign_metadata={}
+        )
+
+        latency = time.time() - start
 
         self.state.strategy = strategy
 
-        logger.info("[PLAN] Strategy created")
+        logger.info(
+            "[PLAN] Strategy created"
+        )
 
-        self.state.add_log("[PLAN] Strategy created")
+        self.state.add_log(
+            "[PLAN] Strategy created"
+        )
 
+        self.add_agent_trace(
+            agent="PlannerAgent",
 
-    #EXECUTION LOOP
+            action="plan_strategy",
 
-    def execute_pipeline(self):
+            input_data={
+                "selected_count": len(
+                    state["selected_leads"]
+                )
+            },
 
-        logger.info("[EXEC] Processing selected leads")
+            output_data=strategy,
 
-        self.state.add_log("[EXEC] Processing selected leads")
+            latency=latency,
+
+            success=True
+        )
+
+        return {
+            **state,
+
+            "strategy": strategy,
+
+            "logs": self.state.logs
+        }
+
+    def execute_pipeline_node(
+        self,
+        state: GraphState
+    ):
+
+        logger.info(
+            "[EXEC] Processing selected leads"
+        )
+
+        self.state.add_log(
+            "[EXEC] Processing selected leads"
+        )
 
         results = []
 
-        for lead in self.state.selected_leads:
+        for lead in state[
+            "selected_leads"
+        ]:
 
             user_id = lead["user_id"]
 
             success = False
+
             attempts = 0
+
             validation_issues = []
 
             retry_context = {}
 
             while attempts < self.MAX_RETRIES:
 
-                 attempts += 1
+                attempts += 1
 
-                #EXECUTION
+                exec_start = time.time()
 
-                 generated = self.executor_agent.execute(
-                    lead=lead,
-                    strategy=self.state.strategy,
-                    retry_context=retry_context
+                try:
+
+                    generated = (
+                        self.executor_agent.execute(
+                            lead=lead,
+                            strategy=state[
+                                "strategy"
+                            ],
+                            retry_context=retry_context
+                        )
+                    )
+
+                except Exception as e:
+
+                    logger.error(
+                        f"[EXECUTOR] "
+                        f"Generation failed "
+                        f"for user {user_id}: "
+                        f"{str(e)}"
+                    )
+
+                    generated = {
+                        "message":
+                            "Fallback outreach message.",
+                        "channel":
+                            "email"
+                    }
+
+                exec_latency = (
+                    time.time() - exec_start
                 )
 
-                 self.state.add_trace(
+                self.add_agent_trace(
                     agent="ExecutorAgent",
+
                     action="generate_message",
-                    outcome=f"attempt_{attempts}"
+
+                    input_data=lead,
+
+                    output_data=generated,
+
+                    latency=exec_latency,
+
+                    success=True
                 )
 
-                #VALIDATION
+                val_start = time.time()
 
-                 validation = self.validator_agent.execute(
-                     generated_message=generated,
-                     strategy=self.state.strategy
-                 )
+                validation = (
+                    self.validator_agent.execute(
+                        generated_message=generated,
+                        strategy=state[
+                            "strategy"
+                        ]
+                    )
+                )
 
-                 self.state.add_trace(
+                val_latency = (
+                    time.time() - val_start
+                )
+
+                self.add_agent_trace(
                     agent="ValidatorAgent",
+
                     action="validate_message",
-                    outcome="passed" if validation["valid"] else "failed"
-                 )
 
-                 #SUCCESS
+                    input_data=generated,
 
-                 if (
-                     validation["valid"]
-                     and validation["quality_score"] >= 0.75
+                    output_data=validation,
+
+                    latency=val_latency,
+
+                    success=validation["valid"]
+                )
+
+                if (
+                    validation["valid"]
+                    and validation[
+                        "quality_score"
+                    ] >= 0.75
                 ):
 
-                     results.append({
+                    results.append({
+
                         "user_id": user_id,
+
                         "status": "success",
+
                         "attempts": attempts,
-                        "message": generated["message"],
-                        "channel": generated["channel"],
-                        "quality_score": validation["quality_score"],
+
+                        "message":
+                            generated.get(
+                                "message",
+                                ""
+                            ),
+
+                        "channel":
+                            generated.get(
+                                "channel",
+                                "email"
+                            ),
+
+                        "quality_score":
+                            validation.get(
+                                "quality_score",
+                                0
+                            ),
+
                         "validation_issues": []
-                     })
+                    })
 
-                     success = True
+                    success = True
 
-                     break
+                    break
 
-                    #FAILURE
+                validation_issues = (
+                    validation.get(
+                        "issues",
+                        []
+                    )
+                )
 
-                 validation_issues = validation["issues"]
-
-                 logger.warning(
-                    f"[RETRY] Validation failed for user {user_id} "
+                logger.warning(
+                    f"[RETRY] "
+                    f"Validation failed "
+                    f"for user {user_id} "
                     f"(attempt {attempts})"
-                 )
+                )
 
-                 #Retry strategy
-                 retry_context = {
+                retry_context = {
                     "soften_tone": True,
                     "short_cta": True
-                 }
-
-                #MAX RETRIES
+                }
 
             if not success:
 
                 logger.error(
-                    f"[FAILED] Validation failed after retries "
+                    f"[FAILED] Validation failed "
+                    f"after retries "
                     f"for user {user_id}"
-                 )
+                )
 
                 results.append({
+
                     "user_id": user_id,
+
                     "status": "failed",
+
                     "attempts": attempts,
-                    "reason": "validation_failed",
-                    "validation_issues": validation_issues
+
+                    "reason":
+                        "validation_failed",
+
+                    "validation_issues":
+                        validation_issues
                 })
 
         self.state.results = results
+
+        return {
+            **state,
+
+            "results": results,
+
+            "logs": self.state.logs
+        }
+
+    def finalize_campaign_node(self, state: GraphState):
+
+        self.state.update_status("completed")
+
+        total_leads = len(self.state.input_leads)
+
+        selected_count = len(self.state.selected_leads)
+
+        processed_count = len(self.state.results)
+
+        top_score = 0
+
+        if self.state.selected_leads:
+
+           top_score = self.state.selected_leads[0].get(
+               "priority_score",
+                0
+           )
+
+        logger.info("[DONE] Campaign completed")
+
+        self.state.add_log(
+             "[DONE] Campaign completed"
+        )
+
+        ranked_leads = self.state.scored_leads[:5]
+
+        successful_results = [
+            r for r in self.state.results
+            if r.get("status") == "success"
+        ]
+
+        return {
+
+            # Core
+            "campaign_id": self.state.campaign_id,
+            "status": self.state.status,
+
+        # Snake case
+            "total_leads": total_leads,
+            "selected": selected_count,
+            "processed": processed_count,
+            "top_score": top_score,
+            "ranked_leads": ranked_leads,
+
+        # Camel case compatibility
+            "totalLeads": total_leads,
+            "selectedLeads": selected_count,
+            "processedLeads": processed_count,
+            "topScore": top_score,
+            "rankedLeads": ranked_leads,
+
+        # Data
+            "strategy": self.state.strategy,
+            "results": self.state.results,
+            "successful_results": successful_results,
+
+        # Logs
+            "logs": self.state.logs[-20:],
+
+        # Traces
+            "agent_traces": self.state.agent_traces
+        }
 
     def add_agent_trace(
         self,
@@ -197,86 +556,198 @@ class DecisionOrchestrator:
         output_data,
         latency: float,
         success: bool
-):
+    ):
 
         trace = AgentTrace(
+
             trace_id=str(uuid4()),
-            campaign_id=self.state.campaign_id,
+
+            campaign_id=
+                self.state.campaign_id,
+
             agent=agent,
+
             action=action,
+
             input_data=input_data,
+
             output_data=output_data,
+
             latency=latency,
+
             success=success,
-            timestamp=datetime.utcnow().isoformat()
+
+            timestamp=datetime.utcnow()
+            .isoformat()
         )
 
-        self.state.agent_traces.append(trace.__dict__)    
-
-
-    def finalize_campaign(self) -> Dict:
-
-        self.state.update_status("completed")
-
-        total_leads = len(self.state.input_leads)
-        selected = len(self.state.selected_leads)
-        processed = len(self.state.results)
-
-        top_score = (
-            self.state.selected_leads[0]["priority_score"]
-            if self.state.selected_leads else 0
+        self.state.agent_traces.append(
+            trace.__dict__
         )
 
-        logger.info("[DONE] Campaign completed")
-
-        self.state.add_log("[DONE] Campaign completed")
-
-        return {
-            "campaign_id": self.state.campaign_id,
-            "status": self.state.status,
-            "total_leads": total_leads,
-            "selected": selected,
-            "processed": processed,
-            "top_score": top_score,
-            "strategy": self.state.strategy,
-            "results": self.state.results,
-            "ranked_leads": self.state.scored_leads[:5],
-            "logs": self.state.logs[-10:]
-        }
-
-    #MAIN PIPELINE CONTROLLER
-
-    def run_campaign(self, leads: List[LeadInput]) -> Dict:
+    def run_campaign(    
+        self,
+        leads: List[LeadInput]
+    ) -> Dict:
+ 
+        result = {}
 
         try:
 
-            #Step 1
-            self.initialize_campaign(leads)
+            initial_state = {
 
-            #Step 2
-            self.score_leads()
+                "input_leads": leads,
 
-            #Step 3
-            self.select_top_leads()
+                "scored_leads": [],
 
-            #Step 4
-            self.plan_strategy()
+                "selected_leads": [],
 
-            #Step 5
-            self.execute_pipeline()
+                "strategy": {},
 
-            #Step 6
-            return self.finalize_campaign()
+                "results": [],
+
+                "current_lead_index": 0,
+
+                "campaign_id": "",
+
+                "status": "initialized",
+
+                "logs": []
+            }
+
+            result = self.graph.invoke(
+                initial_state
+            )
+
+            return {
+
+                "campaign_id":
+                    result.get(
+                        "campaign_id"
+                    ),
+
+                "status":
+                    result.get(
+                        "status"
+                    ),
+
+                "total_leads":
+                    result.get(
+                        "total_leads",
+                        0
+                    ),
+
+                "selected":
+                    len(
+                        result.get(
+                            "selected_leads",
+                            []
+                        )
+                    ),    
+
+                "processed":
+                    len(
+                       result.get(
+                           "processed",
+                           []
+                    )   
+                ),
+
+                "top_score":
+                   max(
+                      [
+                           lead.get("score", 0)
+                           for lead in result.get(
+                               "ranked_leads",
+                               []
+                           )
+                      ],
+                      default=0
+                    ),
+
+                "strategy":
+                    result.get(
+                        "strategy",
+                        {}
+                    ),
+
+                "results":
+                    result.get(
+                        "results",
+                        []
+                    ),
+
+                "ranked_leads":
+                    result.get(
+                        "ranked_leads",
+                        []
+                    ),
+
+                "selected_leads":
+                    result.get(
+                        "selected_leads",
+                        []
+                    ),
+
+                "logs":
+                    result.get(
+                        "logs",
+                        []
+                    ),
+
+                "agent_traces":
+                    result.get(
+                        "agent_traces",
+                        []
+                    )
+            }
 
         except Exception as e:
 
-            logger.exception("[ERROR] Campaign failed")
+            logger.exception(
+                "[ERROR] Campaign failed"
+            )
 
             if self.state:
-                self.state.update_status("failed")
-                self.state.add_log(f"[ERROR] {str(e)}")
+
+                self.state.update_status(
+                    "failed"
+                )
+
+                self.state.add_log(
+                    f"[ERROR] {str(e)}"
+                )
 
             return {
-                "status": "failed",
-                "error": str(e)
+
+    # IDs / status
+                "campaign_id": result.get("campaign_id"),
+                "status": result.get("status"),
+
+    # Snake case
+                "total_leads": result.get("total_leads", 0),
+                "selected": result.get("selected", 0),
+                "processed": result.get("processed", 0),
+                "top_score": result.get("top_score", 0),
+                "ranked_leads": result.get("ranked_leads", []),
+
+    # Camel case compatibility
+                "totalLeads": result.get("totalLeads", result.get("total_leads", 0)),
+                "selectedLeads": result.get("selectedLeads", result.get("selected", 0)),
+                "processedLeads": result.get("processedLeads", result.get("processed", 0)),
+                "topScore": result.get("topScore", result.get("top_score", 0)),
+                "rankedLeads": result.get("rankedLeads", result.get("ranked_leads", [])),
+
+    # Data
+                "strategy": result.get("strategy", {}),
+                "results": result.get("results", []),
+                "successful_results": result.get("successful_results", []),
+
+    # Logs
+                "logs": result.get("logs", []),
+
+    # Agent traces
+                "agent_traces": result.get("agent_traces", [])
             }
+
+            
