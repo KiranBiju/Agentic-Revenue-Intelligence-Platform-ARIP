@@ -591,6 +591,7 @@ This project demonstrates:
 ## Product Enhancements
 
 * Authentication and RBAC
+* Integrating CRM & Mail tools (MCP)
 * Webhook support
 
 ## Infrastructure
