@@ -54,11 +54,11 @@ ARIP solves this problem by:
 * Enforces business constraints
 * Maintains state and traceability
 
-### 🛠 Tool Execution Layer
+### 🛠 Tool Execution Layer (mock)
 
-* Email sending (mock/real)
+* Email sending 
 * CRM updates
-* LinkedIn outreach (extensible)
+* LinkedIn outreach 
 
 ### 🗄 Persistent Storage
 
