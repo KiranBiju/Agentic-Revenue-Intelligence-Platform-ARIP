@@ -103,9 +103,9 @@ Client (CRM / Streamlit Dashboard / API User)
                 ↓
          Tool Execution
                 ↓
-     PostgreSQL + Redis
+       PostgreSQL + Redis
                 ↓
- Observability & Feedback
+    Observability & Feedback
 ```
 
 ---
@@ -133,7 +133,7 @@ Tool Execution (email/CRM)
    ↓
 Campaign Completion
    ↓
-Metrics + Analytics
+Metrics
 ```
 
 ---
@@ -166,7 +166,7 @@ Generates personalized messages and executes actions.
 **Can use**:
 
 * Deterministic templates
-* External LLMs (OpenAI, Groq, Anthropic)
+* External LLMs (OpenAI, Groq, Claude)
 
 ---
 
@@ -378,55 +378,12 @@ Checks API, database, and Redis health.
 
 ---
 
-# 📥 Sample Request
-
-```json
-{
-  "leads": [
-    {
-      "user_id": 1,
-      "name": "Kiran",
-      "email": "user@example.com",
-      "role": "Engineer",
-      "years_experience": 3,
-      "company": "Tesla",
-      "company_size": 100,
-      "activity_score": 5
-    }
-  ]
-}
-```
-
----
-
-# 📤 Sample Response
-
-```json
-{
-  "campaign_id": "0daa0c9a-cabb-4ce4-b966-d43221963008",
-  "status": "completed",
-  "selected": 1,
-  "processed": 1,
-  "top_score": 0.473,
-  "results": [
-    {
-      "user_id": 1,
-      "status": "success",
-      "attempts": 1,
-      "quality_score": 1.0
-    }
-  ]
-}
-```
-
----
-
 # 🧪 Running Locally
 
 ## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/agentic-revenue-intelligence-platform.git
+git clone https://github.com/KiranBiju/agentic-revenue-intelligence-platform.git
 cd agentic-revenue-intelligence-platform
 ```
 
@@ -515,33 +472,6 @@ Run:
 
 ```bash
 docker run -p 8000:8000 arip
-```
-
----
-
-# 📈 Analytics and Observability
-
-ARIP tracks:
-
-* Agent decisions
-* Tool executions
-* Validation failures
-* Retry attempts
-* Campaign duration
-* Success rate
-* Average attempts
-
-Example metrics:
-
-```json
-{
-  "total_processed": 100,
-  "sent": 92,
-  "failed": 8,
-  "success_rate": 0.92,
-  "avg_attempts": 1.14,
-  "duration_seconds": 12.5
-}
 ```
 
 ---
